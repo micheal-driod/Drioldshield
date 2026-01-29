@@ -18,6 +18,7 @@ android.allow_backup = True
 
 # CRITICAL SETTINGS
 android.accept_sdk_license = True
+# Docker image handles these versions automatically
 android.api = 33
 android.minapi = 21
 android.ndk = 25b

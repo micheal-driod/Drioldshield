@@ -5,45 +5,23 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1. Set up Java 17 (Required)
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      # We run the build INSIDE the official container
+      # This bypasses all 'missing library' errors on the host
+      - name: Build with Buildozer Docker
+        uses: docker://kivy/buildozer:latest
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          args: buildozer android debug
+        env:
+          # This fixes permission issues by telling Docker to run as the current user
+          USER_ID: 1001
+          GROUP_ID: 1001
 
-      # 2. Set up Python 3.10
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      # 3. FIX: Install missing 'libtinfo5' manually
-      - name: Install System Dependencies
-        run: |
-          sudo add-apt-repository universe
-          sudo apt-get update
-          sudo apt-get install -y libncurses5 libtinfo5
-          sudo apt-get install -y build-essential git zip unzip autoconf libtool pkg-config zlib1g-dev cmake libffi-dev libssl-dev
-
-      # 4. Install Buildozer
-      - name: Install Buildozer
-        run: |
-          pip install --upgrade pip
-          pip install buildozer cython==0.29.33
-
-      # 5. Build (Pre-accept licenses via 'yes' pipe)
-      - name: Build with Buildozer
-        run: |
-          yes | buildozer android debug
-
-      # 6. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
