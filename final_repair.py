@@ -4,8 +4,8 @@ import os
 workflow_dir = os.path.join(".github", "workflows")
 os.makedirs(workflow_dir, exist_ok=True)
 
-# 2. WRITE A "BARE METAL" BUILD.YML (No Docker, No Permission Errors)
-# This installs all the tools directly on the server.
+# 2. WRITE THE WORKING BUILD.YML
+# Key Fix: explicitly adding 'universe' repo and installing libncurses5/libtinfo5
 build_yml = """name: Build Android APK
 on:
   push:
@@ -13,46 +13,45 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Install Java 17 (Required for modern Android builds)
+      # 1. Set up Java 17 (Required)
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # Install Python 3.10
+      # 2. Set up Python 3.10
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # Install the heavy system libraries Android needs
+      # 3. FIX: Install missing 'libtinfo5' manually
       - name: Install System Dependencies
         run: |
+          sudo add-apt-repository universe
           sudo apt-get update
-          sudo apt-get install -y \
-            build-essential git zip unzip autoconf libtool pkg-config \
-            libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev \
-            libssl-dev zlib1g-dev
+          sudo apt-get install -y libncurses5 libtinfo5
+          sudo apt-get install -y build-essential git zip unzip autoconf libtool pkg-config zlib1g-dev cmake libffi-dev libssl-dev
 
-      # Install Buildozer
+      # 4. Install Buildozer
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
           pip install buildozer cython==0.29.33
 
-      # Build! (Force accept all licenses)
+      # 5. Build (Pre-accept licenses via 'yes' pipe)
       - name: Build with Buildozer
         run: |
           yes | buildozer android debug
 
-      # Upload the result
+      # 6. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
@@ -62,10 +61,9 @@ jobs:
 
 with open(os.path.join(workflow_dir, "build.yml"), "w") as f:
     f.write(build_yml)
-    print("✅ Fixed .github/workflows/build.yml")
+    print("✅ Created build.yml with 'libtinfo5' fix.")
 
-# 3. WRITE A SAFE BUILDOZER.SPEC
-# This version explicitly accepts the SDK license to prevent hanging.
+# 3. ENSURE BUILDOZER.SPEC IS CORRECT
 spec_content = """[app]
 title = DroidShield
 package.name = droidshield
@@ -84,11 +82,8 @@ fullscreen = 0
 android.archs = arm64-v8a, armeabi-v7a
 android.allow_backup = True
 
-# CRITICAL FOR GITHUB ACTIONS
-# If this is False, the build fails waiting for you to type 'y'
+# CRITICAL SETTINGS
 android.accept_sdk_license = True
-
-# VERSIONS (These work best with Java 17)
 android.api = 33
 android.minapi = 21
 android.ndk = 25b
@@ -100,6 +95,4 @@ warn_on_root = 1
 
 with open("buildozer.spec", "w") as f:
     f.write(spec_content)
-    print("✅ Fixed buildozer.spec (License acceptance set to True)")
-
-print("🎉 Files repaired. Ready to push.")
+    print("✅ Verified buildozer.spec.")
