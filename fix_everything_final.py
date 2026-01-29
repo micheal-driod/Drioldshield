@@ -1,4 +1,12 @@
-name: Build Android APK
+import os
+
+# 1. SETUP FOLDERS
+workflow_dir = os.path.join(".github", "workflows")
+os.makedirs(workflow_dir, exist_ok=True)
+
+# 2. WRITE THE FINAL ROBUST BUILD.YML
+# Key Difference: We use 'yes' on sdkmanager DIRECTLY, not just buildozer.
+build_yml = """name: Build Android APK
 on:
   push:
     branches: [ main ]
@@ -28,7 +36,10 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y             build-essential git zip unzip autoconf libtool pkg-config             libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev             libssl-dev zlib1g-dev
+          sudo apt-get install -y \
+            build-essential git zip unzip autoconf libtool pkg-config \
+            libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev \
+            libssl-dev zlib1g-dev
 
       # 4. Install Buildozer
       - name: Install Buildozer
@@ -60,3 +71,45 @@ jobs:
         with:
           name: package
           path: bin/*.apk
+"""
+
+with open(os.path.join(workflow_dir, "build.yml"), "w") as f:
+    f.write(build_yml)
+    print("✅ Created robust build.yml")
+
+# 3. WRITE THE CORRECT BUILDOZER.SPEC
+# We must ensure 'android.accept_sdk_license = True' is present
+spec_content = """[app]
+title = DroidShield
+package.name = droidshield
+package.domain = org.test
+source.dir = .
+source.include_exts = py,png,jpg,kv,atlas
+version = 0.1
+requirements = python3,kivy==2.2.1,android,pyjnius,requests
+
+# PERMISSIONS
+android.permissions = INTERNET,ACCESS_NETWORK_STATE
+
+# ANDROID CONFIG
+orientation = portrait
+fullscreen = 0
+android.archs = arm64-v8a, armeabi-v7a
+android.allow_backup = True
+
+# CRITICAL SETTINGS
+android.accept_sdk_license = True
+android.api = 33
+android.minapi = 21
+android.ndk = 25b
+
+[buildozer]
+log_level = 2
+warn_on_root = 1
+"""
+
+with open("buildozer.spec", "w") as f:
+    f.write(spec_content)
+    print("✅ Created correct buildozer.spec")
+
+print("🎉 DONE. Now run: git add . && git commit -m 'Final Fix' && git push")
